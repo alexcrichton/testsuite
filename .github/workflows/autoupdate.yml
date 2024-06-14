@@ -12,14 +12,26 @@ on:
 
 jobs:
   update:
+    # Only run for non-`WebAssembly/testsuite` repositories if manually
+    # scheduled. Otherwise don't run this for forks of the `testsuite` repo on a
+    # cron job as that's not what most want anyway.
     if: "github.repository == 'WebAssembly/testsuite' || !github.event.schedule"
-    name: TODO
+    name: Maybe create a PR with an update.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          # Get the full git history as we might make a PR.
           fetch-depth: 0
-      - run: ./update-testsuite.sh
+
+      # Run the standard `./update-testsuite.sh` script after configuring git to
+      # allow making commits.
+      - run: |
+          git config user.name 'WebAssembly/testsuite auto-update'
+          git config user.email 'github-actions@users.noreply.github.com'
+          ./update-testsuite.sh
+
+      # If the current HEAD is different then a commit was made, so make a PR.
       - run: |
           if [ "${{ github.sha }}" != $(git rev-parse HEAD) ]; then
             gh pr create --title "Pull request title" --body "Pull request body"
