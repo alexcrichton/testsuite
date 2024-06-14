@@ -1,0 +1,26 @@
+name: "Auto-update process"
+on:
+  schedule:
+    # “At 20:00 on Wednesday.”
+    #
+    # https://crontab.guru/#0_20_*_*_3
+    - cron: '0 20 * * 3'
+
+  # Allow manually triggering this request via the button at
+  # https://github.com/WebAssembly/testsuite/actions/workflows/autoupdate.yml
+  workflow_dispatch:
+
+jobs:
+  update:
+    if: github.repository == 'WebAssembly/testsuite'
+    name: TODO
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: ./update-testsuite.sh
+      - run: |
+          if [ "${{ github.sha }}" != $(git rev-parse HEAD) ]; then
+            gh pr create --title "Pull request title" --body "Pull request body"
+          fi

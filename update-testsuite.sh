@@ -1,9 +1,25 @@
 #!/bin/bash
+# Update tests based on upstream repositories.
 set -e
 set -u
 set -o pipefail
 
-repos='spec threads simd exception-handling gc bulk-memory-operations tail-call nontrapping-float-to-int-conversions multi-value host-bindings sign-extension-ops reference-types'
+non_tests=":(exclude)test/"
+
+repos='
+  spec
+  threads
+  exception-handling
+  gc
+  tail-call
+  host-bindings
+  annotations
+  function-references
+  memory64
+  extended-const
+  multi-memory
+  relaxed-simd
+'
 
 log_and_run() {
     echo ">>" $*
@@ -31,7 +47,7 @@ update_repo() {
     pushdir repos
         if [ -d ${repo} ]; then
             log_and_run git -C ${repo} fetch origin
-            log_and_run git -C ${repo} reset origin/master --hard
+            log_and_run git -C ${repo} reset origin/HEAD --hard
         else
             log_and_run git clone https://github.com/WebAssembly/${repo}
         fi
@@ -57,18 +73,18 @@ merge_with_spec() {
     pushdir repos/${repo}
         # Create and checkout "try-merge" branch.
         if ! git branch | grep try-merge >/dev/null; then
-            log_and_run git branch try-merge origin/master
+            log_and_run git branch try-merge origin/HEAD
         fi
         log_and_run git checkout try-merge
 
-        # Attempt to merge with spec/master.
-        log_and_run git reset origin/master --hard
-        try_log_and_run git merge -q spec/master -m "merged"
+        # Attempt to merge with spec/main.
+        log_and_run git reset origin/HEAD --hard
+        try_log_and_run git merge -q spec/main -m "merged"
         if [ $? -ne 0 ]; then
             # Ignore merge conflicts in non-test directories.
             # We don't care about those changes.
-            try_log_and_run git checkout --ours document interpreter
-            try_log_and_run git add document interpreter
+            try_log_and_run git checkout --ours ${non_tests}
+            try_log_and_run git add ${non_tests}
             try_log_and_run git -c core.editor=true merge --continue
             if [ $? -ne 0 ]; then
                 git merge --abort
@@ -102,22 +118,37 @@ for repo in ${repos}; do
         wast_dir=proposals/${repo}
         mkdir -p ${wast_dir}
 
-        # Don't add tests from propsoal that are the same as spec.
+        # Don't add tests from proposal that are the same as spec.
         pushdir repos/${repo}
             for new in $(find test/core -name \*.wast); do
                 old=../../repos/spec/${new}
                 if [[ ! -f ${old} ]] || ! diff ${old} ${new} >/dev/null; then
-                    log_and_run cp ${new} ../../${wast_dir}
+                    log_and_run cp ${new} ../../${wast_dir}/
+                fi
+            done
+            for new in $(find test/legacy -name \*.wast); do
+                old=../../repos/spec/${new}
+                if [[ ! -f ${old} ]] || ! diff ${old} ${new} >/dev/null; then
+                    mkdir -p ../../${wast_dir}/legacy/
+                    log_and_run cp ${new} ../../${wast_dir}/legacy/
                 fi
             done
         popdir
     fi
 
+    # Check whether any files were removed.
+    for old in $(find ${wast_dir} -maxdepth 1 -name \*.wast); do
+      new=$(find repos/${repo}/test/core -name ${old##*/})
+      if [[ ! -f ${new} ]]; then
+          log_and_run git rm ${old}
+      fi
+    done
+
     # Check whether any files were updated.
-    if [ $(git status -s ${wast_dir}/*.wast | wc -l) -ne 0 ]; then
+    if [ $(git status -s ${wast_dir} | wc -l) -ne 0 ]; then
         log_and_run git add ${wast_dir}/*.wast
 
-        repo_sha=$(git -C repos/${repo} log --max-count=1 --oneline origin/master| sed -e 's/ .*//')
+        repo_sha=$(git -C repos/${repo} log --max-count=1 --oneline origin/HEAD| sed -e 's/ .*//')
         echo "  ${repo}:" >> commit_message
         echo "    https://github.com/WebAssembly/${repo}/commit/${repo_sha}" >> commit_message
     fi
