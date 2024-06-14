@@ -36,3 +36,5 @@ jobs:
           if [ "${{ github.sha }}" != $(git rev-parse HEAD) ]; then
             gh pr create --title "Pull request title" --body "Pull request body"
           fi
+        env:
+          GH_TOKEN: ${{ github.token }}
