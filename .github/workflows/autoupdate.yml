@@ -27,8 +27,8 @@ jobs:
       # Run the standard `./update-testsuite.sh` script after configuring git to
       # allow making commits.
       - run: |
-          git config user.name 'WebAssembly/testsuite auto-update'
-          git config user.email 'github-actions@users.noreply.github.com'
+          git config --global user.name 'WebAssembly/testsuite auto-update'
+          git config --global user.email 'github-actions@users.noreply.github.com'
           ./update-testsuite.sh
 
       # If the current HEAD is different then a commit was made, so make a PR.
