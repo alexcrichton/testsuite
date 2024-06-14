@@ -12,7 +12,7 @@ on:
 
 jobs:
   update:
-    if: github.repository == 'WebAssembly/testsuite'
+    if: "github.repository == 'WebAssembly/testsuite' || !github.event.schedule"
     name: TODO
     runs-on: ubuntu-latest
     steps:
